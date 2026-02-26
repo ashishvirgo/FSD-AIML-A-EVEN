@@ -1,13 +1,29 @@
 import http from "http"
+import fs from "fs/promises"
 const port=5001;
-const users=[
-    {id:1,name:"abc",email:"abc@gmail.com"},
-    {id:2,name:"abc2",email:"abc2@gmail.com"},
-    {id:3,name:"abc3",email:"abc3@gmail.com"},
-]
-const server=http.createServer((req,res)=>{
+let users=[];
+async function saveData(user){
+    try{
+      await fs.writeFile("users.json",JSON.stringify(user))
+    }
+    catch(err){
+        console.log("Error=",err.message)
+    }
+}
+async function readData(){
+    try{
+       const data=await fs.readFile("users.json","utf-8");
+       users=JSON.parse(data);
+    }
+    catch(err){
+        users=[];
+        console.log("Error=",err.message)
+    }
+}
+const server=http.createServer(async(req,res)=>{
 const url=req.url;
 const method=req.method;
+await readData();
 if(url=="/users" && method=="GET"){
     res.statusCode=200;
     res.end(JSON.stringify(users))
@@ -29,7 +45,7 @@ else if(url=="/createuser" && method=="POST"){
     req.on("data",(chunk)=>{
       body=body+chunk;
     })
-    req.on("end",()=>{
+    req.on("end",async()=>{
         const data=JSON.parse(body);
         if(data.name==null || data.email==null){
             res.statusCode=400;
@@ -41,6 +57,7 @@ else if(url=="/createuser" && method=="POST"){
             email: data.email
         }
         users.push(newUser);
+        await saveData(users);
        res.statusCode=201;
        console.log(`user id ${newUser.id} created successfully`)
        res.end(`user id ${newUser.id} created successfully`)
@@ -59,9 +76,10 @@ else if(url.startsWith("/users/") && method=="PUT"){
     req.on("data",(chunk)=>{
         body=body+chunk;
     })
-    req.on("end",()=>{
+    req.on("end",async()=>{
         const data=JSON.parse(body);
         users[userIndex]={...users[userIndex],...data};
+        await saveData(users);
         console.log(`User id ${id} updated successfully`)
         res.end(`User id ${id} updated successfully`)
     })
@@ -75,7 +93,8 @@ else if(url.startsWith("/users/") && method=="DELETE"){
      console.log(`user id ${id} not found`)
      return res.end(`user id ${id} not found`)
     }
-    users.splice(userIndex,1)
+    users.splice(userIndex,1);
+    await saveData(users);
     console.log(`user id ${id} deleted successfully found`)
     res.end(`user id ${id} deleted successfully found`)
 }
